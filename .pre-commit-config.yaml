@@ -5,10 +5,16 @@ repos:
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
+      # Encoding test vectors are placeholder byte patterns and preimage
+      # encodings by specification -- never digests, never key material -- so
+      # every hex value in them trips the high-entropy detector. They are also
+      # regenerated from the reference encoder, which would make a baseline a
+      # rubber stamp rather than an audit.
       - id: detect-secrets
         exclude: |
             (?x)^(
                 htmlcov/.*
+                |schemas/encoding/v1\.0/test-vectors\.json
             )$
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -18,8 +24,6 @@ repos:
       - id: check-added-large-files
       - id: check-toml
       - id: check-yaml
-        args:
-          - --unsafe
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
