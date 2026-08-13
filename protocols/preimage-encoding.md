@@ -224,6 +224,11 @@ They are **hash-agnostic**: every value is an *encoding* (the bytes that would
 be hashed), never a digest. Fixed-width digest inputs use recognisable
 placeholder byte patterns.
 
+The vectors are generated — not hand-maintained — by the reference
+implementation in [`../src/pci_preimage`](../src/pci_preimage)
+(`python -m pci_preimage.generate_vectors`), whose conformance suite also
+round-trip decodes every vector back to its field tuple.
+
 The file covers:
 
 - One worked encoding per structure (including the nested payment commitment and
