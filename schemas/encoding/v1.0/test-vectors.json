@@ -195,9 +195,53 @@
       "note": "An empty variable-length field is still emitted with its 4-byte length prefix (00000000). Empty is distinct from a different value; all fields are mandatory in a given structure version.",
       "fields": [
         {
+          "name": "domain_sep",
+          "kind": "var",
+          "value_utf8": "PCI/did-envelope/v1"
+        },
+        {
+          "name": "sender_did",
+          "kind": "var",
+          "value_utf8": "did:pci:ephemeral:z6Mkabc"
+        },
+        {
+          "name": "recipient_did",
+          "kind": "var",
+          "value_utf8": "did:web:example.com"
+        },
+        {
+          "name": "action",
+          "kind": "var",
+          "value_utf8": "proof.submit"
+        },
+        {
           "name": "policy_id",
           "kind": "var",
           "value_utf8": ""
+        },
+        {
+          "name": "nonce",
+          "kind": "fixed",
+          "width": 16,
+          "value_hex": "77777777777777777777777777777777"
+        },
+        {
+          "name": "issued_at",
+          "kind": "fixed",
+          "width": 8,
+          "value_hex": "00000000687ca840"
+        },
+        {
+          "name": "expires_at",
+          "kind": "fixed",
+          "width": 8,
+          "value_hex": "00000000687cb650"
+        },
+        {
+          "name": "body_hash",
+          "kind": "fixed",
+          "width": 32,
+          "value_hex": "8888888888888888888888888888888888888888888888888888888888888888"
         }
       ],
       "encoding_hex": "000000135043492f6469642d656e76656c6f70652f7631000000196469643a7063693a657068656d6572616c3a7a364d6b616263000000136469643a7765623a6578616d706c652e636f6d0000000c70726f6f662e7375626d6974000000007777777777777777777777777777777700000000687ca84000000000687cb6508888888888888888888888888888888888888888888888888888888888888888"
