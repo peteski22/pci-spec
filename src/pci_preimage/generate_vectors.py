@@ -34,6 +34,10 @@ def _var(name: str, text: str, note: str | None = None) -> _VectorField:
     return _VectorField(name, VariableField(text.encode("utf-8")), note)
 
 
+def _var_hex(name: str, value_hex: str, note: str | None = None) -> _VectorField:
+    return _VectorField(name, VariableField(bytes.fromhex(value_hex)), note)
+
+
 def _fixed(name: str, value_hex: str, width: int, note: str | None = None) -> _VectorField:
     return _VectorField(name, FixedField(bytes.fromhex(value_hex), width), note)
 
@@ -64,7 +68,11 @@ def _field_json(vector_field: _VectorField) -> dict:
     entry: dict = {"name": vector_field.name}
     if isinstance(vector_field.field, VariableField):
         entry["kind"] = "var"
-        entry["value_utf8"] = vector_field.field.value.decode("utf-8")
+        value = vector_field.field.value
+        if value.isascii() and value.decode("ascii").isprintable():
+            entry["value_utf8"] = value.decode("ascii")
+        else:
+            entry["value_hex"] = value.hex()
     else:
         entry["kind"] = "fixed"
         entry["width"] = vector_field.field.width
@@ -148,8 +156,35 @@ def build_vectors() -> dict:
             payment,
             [
                 _var("domain_sep", payment.domain_separator),
-                _fixed("currency", "01", 1, note="enum: sats=1, lovelace=2, usd_cents=3"),
+                _var_hex("currency", "01", note="currency tag: sats=0x01"),
                 _fixed("amount", "0000000000000064", 8),
+            ],
+        ),
+        _vector(
+            "payment-commitment-2-ada",
+            payment,
+            [
+                _var("domain_sep", payment.domain_separator),
+                _var_hex("currency", "02", note="currency tag: lovelace=0x02"),
+                _fixed("amount", "00000000001e8480", 8),
+            ],
+        ),
+        _vector(
+            "payment-commitment-cardano-native-usdcx",
+            payment,
+            [
+                _var("domain_sep", payment.domain_separator),
+                _var_hex(
+                    "currency",
+                    "04" + "aa" * 28 + "5553444378",
+                    note=(
+                        "currency tag cardano_native=0x04, followed by the 28-byte "
+                        "minting policy id and the asset name (here 'USDCx'); the "
+                        "internal layout is injective because the tag and policy id "
+                        "are fixed-width and the asset name is terminal"
+                    ),
+                ),
+                _fixed("amount", "00000000004c4b40", 8),
             ],
         ),
         _vector(
@@ -158,7 +193,8 @@ def build_vectors() -> dict:
             [
                 _var("domain_sep", public_input.domain_separator),
                 _fixed("script_hash", "66" * 28, 28),
-                _fixed("policy_hash", "22" * 32, 32),
+                _fixed("spend_ref_hash", "99" * 32, 32),
+                _fixed("policy_content_hash", "22" * 32, 32),
                 _var("context_scope", "medical/diagnosis_codes"),
                 _fixed("required_proof_hash", "33" * 32, 32),
                 _fixed("subject_hash", "44" * 28, 28),
@@ -250,7 +286,7 @@ def build_vectors() -> dict:
     ]
 
     return {
-        "version": "1.0",
+        "version": "1.1",
         "spec": "protocols/preimage-encoding.md",
         "description": (
             "Canonical preimage encoding test vectors. Values are ENCODINGS "
@@ -265,10 +301,20 @@ def build_vectors() -> dict:
             "hash": "NOT specified here; chosen downstream (ADR-005/ADR-007)",
         },
         "domain_separator_registry": {
-            "PCI/spal-commit/v1": "S-PAL policy commitment (yields policy_hash)",
-            "PCI/spal-pubin/v1": "S-PAL zero-knowledge public input",
+            "PCI/spal-commit/v1": "S-PAL policy commitment (yields policy_content_hash)",
+            "PCI/spal-pubin/v2": "S-PAL zero-knowledge public input",
             "PCI/did-envelope/v1": "DID-signed request envelope",
-            "PCI/spal-payment/v1": "payment commitment (nested in spal-pubin)",
+            "PCI/spal-payment/v2": "payment commitment (nested in spal-pubin)",
+        },
+        "retired_domain_separators": {
+            "PCI/spal-pubin/v1": (
+                "superseded by v2 (added spend_ref_hash, renamed policy_hash to "
+                "policy_content_hash) before any implementation existed"
+            ),
+            "PCI/spal-payment/v1": (
+                "superseded by v2 (currency became a variable-length "
+                "chain-settlement field) before any implementation existed"
+            ),
         },
         "vectors": vectors,
         "adversarial": adversarial,

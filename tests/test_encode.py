@@ -53,8 +53,10 @@ ADVERSARIAL_PARTS = {
 def fields_from_json(entries: list[dict]) -> list[Field]:
     fields: list[Field] = []
     for entry in entries:
-        if entry["kind"] == "var":
+        if entry["kind"] == "var" and "value_utf8" in entry:
             fields.append(VariableField(entry["value_utf8"].encode("utf-8")))
+        elif entry["kind"] == "var":
+            fields.append(VariableField(bytes.fromhex(entry["value_hex"])))
         else:
             fields.append(FixedField(bytes.fromhex(entry["value_hex"]), entry["width"]))
     return fields

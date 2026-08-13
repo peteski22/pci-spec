@@ -41,11 +41,12 @@ SPAL_POLICY_COMMITMENT = Structure(
 
 SPAL_ZK_PUBLIC_INPUT = Structure(
     name="spal_zk_public_input",
-    domain_separator="PCI/spal-pubin/v1",
+    domain_separator="PCI/spal-pubin/v2",
     specs=(
         _var("domain_sep"),
         _fixed("script_hash", 28),
-        _fixed("policy_hash", 32),
+        _fixed("spend_ref_hash", 32),
+        _fixed("policy_content_hash", 32),
         _var("context_scope"),
         _fixed("required_proof_hash", 32),
         _fixed("subject_hash", 28),
@@ -56,10 +57,10 @@ SPAL_ZK_PUBLIC_INPUT = Structure(
 
 PAYMENT_COMMITMENT = Structure(
     name="payment_commitment",
-    domain_separator="PCI/spal-payment/v1",
+    domain_separator="PCI/spal-payment/v2",
     specs=(
         _var("domain_sep"),
-        _fixed("currency", 1),
+        _var("currency"),
         _fixed("amount", 8),
     ),
 )
