@@ -26,7 +26,7 @@ TWO_VARIABLE_FIELDS = (
 
 
 def value_bytes(entry: dict) -> bytes:
-    if entry["kind"] == "var":
+    if entry["kind"] == "var" and "value_utf8" in entry:
         return entry["value_utf8"].encode("utf-8")
     return bytes.fromhex(entry["value_hex"])
 
@@ -40,8 +40,8 @@ def test_round_trip_re_derives_field_tuple(vector: dict) -> None:
 
 def test_round_trip_over_encode_output() -> None:
     fields = (
-        VariableField(b"PCI/spal-payment/v1"),
-        FixedField(b"\x01", 1),
+        VariableField(b"PCI/spal-payment/v2"),
+        VariableField(b"\x01"),
         FixedField(b"\x00" * 7 + b"\x64", 8),
     )
     structure = STRUCTURES["payment_commitment"]

@@ -1,6 +1,17 @@
 # Canonical Preimage Encoding
 
-Version: 1.0
+Version: 1.1
+
+## Changelog
+
+- **1.1** — Amended the S-PAL public-input and payment-commitment structures to
+  match the deployed Cardano validator (pci-contracts PR #16): added
+  `spend_ref_hash`, renamed `policy_hash` to `policy_content_hash` and pinned
+  its Cardano profile, and made `currency` a variable-length chain-settlement
+  field so Cardano native assets are expressible. Both structures were bumped
+  to `/v2` registry entries; the `/v1` entries are retired and were never
+  implemented by any downstream repository.
+- **1.0** — Initial version.
 
 ## Overview
 
@@ -97,15 +108,18 @@ The domain separator is a fixed ASCII namespace string with an embedded
 version. The registry below is the single source of truth; a repository MUST
 use one of these strings verbatim and MUST NOT invent its own.
 
-| Domain separator | Structure |
-|------------------|-----------|
-| `PCI/spal-commit/v1` | S-PAL policy commitment |
-| `PCI/spal-pubin/v1` | S-PAL zero-knowledge public input |
-| `PCI/did-envelope/v1` | DID-signed request envelope |
-| `PCI/spal-payment/v1` | Payment commitment (nested in the public input) |
+| Domain separator | Structure | Status |
+|------------------|-----------|--------|
+| `PCI/spal-commit/v1` | S-PAL policy commitment | active |
+| `PCI/spal-pubin/v2` | S-PAL zero-knowledge public input | active |
+| `PCI/did-envelope/v1` | DID-signed request envelope | active |
+| `PCI/spal-payment/v2` | Payment commitment (nested in the public input) | active |
+| `PCI/spal-pubin/v1` | superseded by `/v2`; never implemented | retired |
+| `PCI/spal-payment/v1` | superseded by `/v2`; never implemented | retired |
 
 A new context or a breaking change to an existing structure gets a new registry
-entry (bump the version suffix), never a silent reuse.
+entry (bump the version suffix), never a silent reuse. A retired entry MUST NOT
+be used by any implementation.
 
 ## Structures in Scope
 
@@ -118,8 +132,9 @@ already injective under raw concatenation.
 
 ### 1. S-PAL policy commitment — `PCI/spal-commit/v1`
 
-Binds a policy's identity to its content. Its digest is the `policy_hash`
-consumed by the zero-knowledge public input (structure 2).
+Binds a policy's identity to its content. Its `content_hash` member is the
+same digest the zero-knowledge public input (structure 2) consumes as
+`policy_content_hash`.
 
 | # | Field | Kind | Width | Description |
 |---|-------|------|-------|-------------|
@@ -129,14 +144,17 @@ consumed by the zero-knowledge public input (structure 2).
 | 3 | `schema_version` | fixed | 2 B | uint16 BE; `0x0100` for S-PAL `1.0` |
 | 4 | `content_hash` | fixed | 32 B | Digest of the policy body (see below) |
 
-`content_hash` is a 32-byte digest of the policy body. It is computed by
-applying this same encoding rule to the body's ordered fields and hashing the
-result. pci-contracts owns the concrete body field list, because the on-chain
-`PolicyDatum` — not the full policy JSON — is the structure actually committed;
-it MUST pin that field list and compute `content_hash` under this rule. From
-the perspective of this spec, `content_hash` is a fixed 32-byte input.
+`content_hash` is a 32-byte digest of the policy body. pci-contracts owns the
+body's committed form, because the on-chain `PolicyDatum` — not the full policy
+JSON — is the structure actually committed. On Cardano the body digest is
+computed over the canonical PlutusData CBOR of the `PolicyDatum`
+(`SerialiseData`; see [Cardano Guidance](#cardano-guidance)) — pci-contracts
+MUST pin the datum shape and every off-chain reproducer MUST serialise the
+identical datum to identical CBOR. From the perspective of this spec,
+`content_hash` is a fixed 32-byte input, and it is the same digest the
+zero-knowledge public input (structure 2) consumes as `policy_content_hash`.
 
-### 2. S-PAL zero-knowledge public input — `PCI/spal-pubin/v1`
+### 2. S-PAL zero-knowledge public input — `PCI/spal-pubin/v2`
 
 The public input a policy-enforcement verifier reconstructs from trusted
 context (per [ADR-005](https://github.com/peteski22/pci-docs/blob/main/decisions/005-cardano-l1-vs-midnight-sidechain-for-zkp.md)),
@@ -146,14 +164,28 @@ field that made the pattern forgeable when concatenated raw.
 
 | # | Field | Kind | Width | Description |
 |---|-------|------|-------|-------------|
-| 0 | `domain_sep` | var | — | `PCI/spal-pubin/v1` |
+| 0 | `domain_sep` | var | — | `PCI/spal-pubin/v2` |
 | 1 | `script_hash` | fixed | 28 B | Blake2b-224 hash of the Plutus V3 own-script |
-| 2 | `policy_hash` | fixed | 32 B | Digest of the S-PAL policy commitment (structure 1) |
-| 3 | **`context_scope`** | var | — | Data scope path (e.g. `medical/diagnosis_codes`) |
-| 4 | `required_proof_hash` | fixed | 32 B | Verifier binding, from `PolicyDatum` |
-| 5 | `subject_hash` | fixed | 28 B | Blake2b-224 of the requester DID |
-| 6 | `access_time` | fixed | 8 B | uint64 BE, canonicalised access time |
-| 7 | `payment_commitment` | fixed | 32 B | Digest of the payment commitment (below) |
+| 2 | `spend_ref_hash` | fixed | 32 B | Digest of the spending output reference (see below) |
+| 3 | `policy_content_hash` | fixed | 32 B | Digest of the committed policy body (structure 1's `content_hash`) |
+| 4 | **`context_scope`** | var | — | Data scope path (e.g. `medical/diagnosis_codes`) |
+| 5 | `required_proof_hash` | fixed | 32 B | Verifier binding, from `PolicyDatum` |
+| 6 | `subject_hash` | fixed | 28 B | Blake2b-224 of the requester DID |
+| 7 | `access_time` | fixed | 8 B | uint64 BE, canonicalised access time |
+| 8 | `payment_commitment` | fixed | 32 B | Digest of the payment commitment (below) |
+
+`spend_ref_hash` binds the public input to the specific UTxO being spent, so a
+commitment produced for one spend cannot be replayed against another UTxO
+carrying an identical policy and redeemer within the same deployment. On
+Cardano it is the Blake2b-256 digest of the canonical PlutusData CBOR of the
+spending `OutputReference` (transaction id and output index).
+
+`policy_content_hash` is the digest of the committed policy body defined in
+structure 1 (`content_hash`): on Cardano, the Blake2b-256 digest of the
+canonical PlutusData CBOR of the on-chain `PolicyDatum`. The full identity
+commitment (structure 1) additionally binds `policy_id` and `owner_did`, which
+exist only off-chain; an on-chain verifier commits to the policy content it can
+see, and the off-chain layer anchors that content to the policy identity.
 
 The 28- and 32-byte widths follow Cardano's Blake2b-224 script/credential
 hashes and Blake2b-256 digests; a downstream circuit that pins a different
@@ -161,17 +193,34 @@ fixed width (for example a different digest, or a BLS12-381 point) remains
 injective, provided the width is fixed by its schema. The width, not the
 specific value, is this spec's contract.
 
-#### Payment commitment (nested) — `PCI/spal-payment/v1`
+#### Payment commitment (nested) — `PCI/spal-payment/v2`
 
-`payment_commitment` (field 7 above) is the digest of this nested preimage.
-Both non-separator fields are fixed-width, so the structure is injective by
-construction; the separator makes it non-collidable with any other context.
+`payment_commitment` (field 8 above) is the digest of this nested preimage.
+Every field is either fixed-width or length-prefixed, so the structure is
+injective by construction; the separator makes it non-collidable with any
+other context.
 
 | # | Field | Kind | Width | Description |
 |---|-------|------|-------|-------------|
-| 0 | `domain_sep` | var | — | `PCI/spal-payment/v1` |
-| 1 | `currency` | fixed | 1 B | uint8 enum: `sats`=1, `lovelace`=2, `usd_cents`=3 |
+| 0 | `domain_sep` | var | — | `PCI/spal-payment/v2` |
+| 1 | `currency` | var | — | Settlement currency encoding (see registry below) |
 | 2 | `amount` | fixed | 8 B | uint64 BE, amount in the currency's smallest unit |
+
+The `currency` field's internal layout is determined by its first byte, the
+currency tag:
+
+| Tag | Currency | Field bytes |
+|-----|----------|-------------|
+| `0x01` | `sats` | the tag byte only |
+| `0x02` | `lovelace` | the tag byte only |
+| `0x03` | `usd_cents` | the tag byte only |
+| `0x04` | Cardano native asset | `0x04` ‖ minting policy id (exactly 28 B) ‖ asset name (0–32 B, terminal) |
+
+Injectivity of the preimage does not depend on the internal layout — the whole
+`currency` field is length-prefixed like any variable-length field. The
+internal layout is itself unambiguous because the tag and policy id are
+fixed-width and the asset name is terminal; an encoder MUST reject a
+`0x04`-tagged currency whose policy id is not exactly 28 bytes.
 
 ### 3. DID-signed request envelope — `PCI/did-envelope/v1`
 
@@ -215,6 +264,16 @@ is **not** a second canonical wire format. Any preimage that crosses layers
 encoding defined above, so that both sides reconstruct identical bytes and
 therefore identical hashes. Two encodings for one cross-layer preimage is a
 correctness trap and is not permitted.
+
+One carve-out follows from that same single-encoding principle: when the value
+being digested **is itself a Plutus data structure** (a datum or a script-context
+value such as an `OutputReference`), its canonical PlutusData CBOR is already
+the one encoding both surfaces share — it is the bytes the chain itself
+serialises — and re-encoding it under the length-prefix rule would create the
+second format this section forbids. Digests of Plutus values
+(`policy_content_hash`, `spend_ref_hash`) are therefore computed over canonical
+PlutusData CBOR on both sides. The top-level preimage that combines such
+digests with other fields still uses the length-prefixed rule.
 
 ## Test Vectors
 
