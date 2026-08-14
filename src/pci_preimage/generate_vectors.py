@@ -52,15 +52,13 @@ def _check_against_structure(structure: Structure, fields: list[_VectorField]) -
         if spec.kind is FieldKind.VARIABLE and not isinstance(vector_field.field, VariableField):
             raise ValueError(f"field '{spec.name}' must be variable-length")
         if spec.kind is FieldKind.FIXED and (
-            not isinstance(vector_field.field, FixedField)
-            or vector_field.field.width != spec.width
+            not isinstance(vector_field.field, FixedField) or vector_field.field.width != spec.width
         ):
             raise ValueError(f"field '{spec.name}' must be fixed-width of {spec.width} bytes")
     domain_sep = fields[0].field.value
     if domain_sep != structure.domain_separator.encode("utf-8"):
         raise ValueError(
-            f"structure '{structure.name}' requires domain separator "
-            f"'{structure.domain_separator}'"
+            f"structure '{structure.name}' requires domain separator '{structure.domain_separator}'"
         )
 
 

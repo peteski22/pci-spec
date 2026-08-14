@@ -110,8 +110,7 @@ def encode(fields: Sequence[Field]) -> bytes:
         else:
             if len(field.value) != field.width:
                 raise FixedWidthError(
-                    f"fixed-width field must be exactly {field.width} bytes, "
-                    f"got {len(field.value)}"
+                    f"fixed-width field must be exactly {field.width} bytes, got {len(field.value)}"
                 )
             out += field.value
     return bytes(out)
