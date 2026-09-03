@@ -18,7 +18,15 @@ from pci_preimage.encoding import (
     VariableField,
     encode,
 )
-from pci_preimage.structures import STRUCTURES, Structure
+from pci_preimage.structures import (
+    CARDANO_MAX_ASSET_NAME_LENGTH,
+    CARDANO_POLICY_ID_WIDTH,
+    STRUCTURES,
+    CurrencyError,
+    Structure,
+    validate_currency,
+    validate_fields,
+)
 
 DEFAULT_OUTPUT = Path("schemas/encoding/v1.0/test-vectors.json")
 
@@ -55,6 +63,7 @@ def _check_against_structure(structure: Structure, fields: list[_VectorField]) -
             not isinstance(vector_field.field, FixedField) or vector_field.field.width != spec.width
         ):
             raise ValueError(f"field '{spec.name}' must be fixed-width of {spec.width} bytes")
+    validate_fields(structure, [vector_field.field.value for vector_field in fields])
     domain_sep = fields[0].field.value
     if domain_sep != structure.domain_separator.encode("utf-8"):
         raise ValueError(
@@ -121,6 +130,78 @@ def _adversarial(
         "encoding_a_hex": encoding_a.hex(),
         "encoding_b_hex": encoding_b.hex(),
         "encoding_distinct": encoding_a != encoding_b,
+    }
+
+
+def _rejected_currency(name: str, currency: bytes, reason: str) -> dict:
+    """Build one currency the reference validator must reject, recording that it did.
+
+    Raises:
+        ValueError: The reference validator accepted the currency, so the case
+            would be committed as a rejection that does not happen.
+    """
+    try:
+        validate_currency(currency)
+    except CurrencyError:
+        rejected = True
+    else:
+        rejected = False
+    if not rejected:
+        raise ValueError(f"currency case '{name}' was accepted but is committed as rejected")
+    return {
+        "name": name,
+        "reason": reason,
+        "currency_hex": currency.hex(),
+        "rejected": rejected,
+    }
+
+
+def _currency_grammar_rule() -> dict:
+    policy_id = b"\xaa" * CARDANO_POLICY_ID_WIDTH
+    return {
+        "name": "malformed-currency-rejected",
+        "description": (
+            "The currency field's internal layout is fixed by its tag byte. An encoder "
+            "MUST reject a field that does not match the layout its tag fixes, never "
+            "truncating, padding, or otherwise repairing it."
+        ),
+        "structure": "payment_commitment",
+        "field": "currency",
+        "cardano_policy_id_width": CARDANO_POLICY_ID_WIDTH,
+        "cardano_max_asset_name_length": CARDANO_MAX_ASSET_NAME_LENGTH,
+        "must_reject": [
+            _rejected_currency(
+                "empty-currency",
+                b"",
+                "no tag byte, so no layout is determined",
+            ),
+            _rejected_currency(
+                "unregistered-tag",
+                b"\x05",
+                "tag 0x05 is not in the currency registry",
+            ),
+            _rejected_currency(
+                "tag-only-currency-with-trailing-bytes",
+                b"\x01\xff",
+                "sats is the tag byte alone; trailing bytes are not part of its layout",
+            ),
+            _rejected_currency(
+                "cardano-native-policy-id-too-short",
+                b"\x04" + policy_id[:-1],
+                (
+                    f"minting policy id must be exactly {CARDANO_POLICY_ID_WIDTH} bytes, "
+                    f"here {CARDANO_POLICY_ID_WIDTH - 1}"
+                ),
+            ),
+            _rejected_currency(
+                "cardano-native-asset-name-too-long",
+                b"\x04" + policy_id + b"n" * (CARDANO_MAX_ASSET_NAME_LENGTH + 1),
+                (
+                    f"asset name must be at most {CARDANO_MAX_ASSET_NAME_LENGTH} bytes, "
+                    f"here {CARDANO_MAX_ASSET_NAME_LENGTH + 1}"
+                ),
+            ),
+        ],
     }
 
 
@@ -325,7 +406,8 @@ def build_vectors() -> dict:
                 ),
                 "max_field_length": MAX_VARIABLE_FIELD_LENGTH,
                 "must_reject": True,
-            }
+            },
+            _currency_grammar_rule(),
         ],
     }
 

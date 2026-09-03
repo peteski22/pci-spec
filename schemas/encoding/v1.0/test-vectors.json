@@ -344,6 +344,46 @@
       "description": "A variable-length field longer than max_field_length MUST be rejected by encoders, never wrapped or truncated.",
       "max_field_length": 4294967295,
       "must_reject": true
+    },
+    {
+      "name": "malformed-currency-rejected",
+      "description": "The currency field's internal layout is fixed by its tag byte. An encoder MUST reject a field that does not match the layout its tag fixes, never truncating, padding, or otherwise repairing it.",
+      "structure": "payment_commitment",
+      "field": "currency",
+      "cardano_policy_id_width": 28,
+      "cardano_max_asset_name_length": 32,
+      "must_reject": [
+        {
+          "name": "empty-currency",
+          "reason": "no tag byte, so no layout is determined",
+          "currency_hex": "",
+          "rejected": true
+        },
+        {
+          "name": "unregistered-tag",
+          "reason": "tag 0x05 is not in the currency registry",
+          "currency_hex": "05",
+          "rejected": true
+        },
+        {
+          "name": "tag-only-currency-with-trailing-bytes",
+          "reason": "sats is the tag byte alone; trailing bytes are not part of its layout",
+          "currency_hex": "01ff",
+          "rejected": true
+        },
+        {
+          "name": "cardano-native-policy-id-too-short",
+          "reason": "minting policy id must be exactly 28 bytes, here 27",
+          "currency_hex": "04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "rejected": true
+        },
+        {
+          "name": "cardano-native-asset-name-too-long",
+          "reason": "asset name must be at most 32 bytes, here 33",
+          "currency_hex": "04aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e6e",
+          "rejected": true
+        }
+      ]
     }
   ]
 }

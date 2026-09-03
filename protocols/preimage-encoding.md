@@ -8,7 +8,8 @@ Version: 1.1
   match the deployed Cardano validator (pci-contracts PR #16): added
   `spend_ref_hash`, renamed `policy_hash` to `policy_content_hash` and pinned
   its Cardano profile, and made `currency` a variable-length chain-settlement
-  field so Cardano native assets are expressible. Both structures were bumped
+  field so Cardano native assets are expressible, with that field's internal
+  layout pinned as a normative encoder rule. Both structures were bumped
   to `/v2` registry entries; the `/v1` entries are retired and were never
   implemented by any downstream repository.
 - **1.0** — Initial version.
@@ -219,8 +220,21 @@ currency tag:
 Injectivity of the preimage does not depend on the internal layout — the whole
 `currency` field is length-prefixed like any variable-length field. The
 internal layout is itself unambiguous because the tag and policy id are
-fixed-width and the asset name is terminal; an encoder MUST reject a
-`0x04`-tagged currency whose policy id is not exactly 28 bytes.
+fixed-width and the asset name is terminal.
+
+The layout is nonetheless normative, so that a malformed currency cannot be
+committed to in the first place. An encoder MUST reject a `currency` field
+that:
+
+- is empty, so no tag determines a layout;
+- carries a tag outside the registry above;
+- carries a tag-only tag (`0x01`–`0x03`) followed by any further bytes;
+- carries tag `0x04` with fewer than 28 bytes after the tag, so the minting
+  policy id is not exactly 28 bytes; or
+- carries tag `0x04` with an asset name longer than 32 bytes — that is, a
+  field longer than 61 bytes in total.
+
+A rejected `currency` MUST NOT be truncated, padded, or otherwise repaired.
 
 ### 3. DID-signed request envelope — `PCI/did-envelope/v1`
 
@@ -300,6 +314,8 @@ The file covers:
   - a re-partition of a real S-PAL identifier pair — the PCI-specific form of
     the Wanchain attack.
 - The over-length-field rejection rule.
+- **Malformed-currency rejection cases**, one per way a `currency` field can
+  violate the layout its tag fixes.
 
 ## Reference Encoding (pseudocode)
 

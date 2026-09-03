@@ -21,21 +21,31 @@ from pci_preimage.encoding import (
     encode,
 )
 from pci_preimage.structures import (
+    CARDANO_MAX_ASSET_NAME_LENGTH,
+    CARDANO_POLICY_ID_WIDTH,
     DID_SIGNED_REQUEST_ENVELOPE,
     PAYMENT_COMMITMENT,
     SPAL_POLICY_COMMITMENT,
     SPAL_ZK_PUBLIC_INPUT,
     STRUCTURES,
+    CurrencyError,
+    CurrencyTag,
     Structure,
+    validate_currency,
+    validate_fields,
 )
 
 __all__ = [
+    "CARDANO_MAX_ASSET_NAME_LENGTH",
+    "CARDANO_POLICY_ID_WIDTH",
     "DID_SIGNED_REQUEST_ENVELOPE",
     "MAX_VARIABLE_FIELD_LENGTH",
     "PAYMENT_COMMITMENT",
     "SPAL_POLICY_COMMITMENT",
     "SPAL_ZK_PUBLIC_INPUT",
     "STRUCTURES",
+    "CurrencyError",
+    "CurrencyTag",
     "DecodeError",
     "Field",
     "FieldKind",
@@ -48,4 +58,6 @@ __all__ = [
     "VariableField",
     "decode",
     "encode",
+    "validate_currency",
+    "validate_fields",
 ]
