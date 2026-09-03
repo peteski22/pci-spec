@@ -352,7 +352,7 @@ def main(argv: list[str] | None = None) -> None:
         help=f"output path (default: {DEFAULT_OUTPUT})",
     )
     args = parser.parse_args(argv)
-    args.output.write_text(render(build_vectors()))
+    args.output.write_text(render(build_vectors()), encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":

@@ -8,10 +8,10 @@ VECTORS_PATH = (
 
 
 def test_generator_reproduces_committed_vector_file() -> None:
-    assert render(build_vectors()) == VECTORS_PATH.read_text()
+    assert render(build_vectors()).encode("utf-8") == VECTORS_PATH.read_bytes()
 
 
 def test_main_writes_vector_file(tmp_path: Path) -> None:
     output = tmp_path / "test-vectors.json"
     main([str(output)])
-    assert output.read_text() == render(build_vectors())
+    assert output.read_bytes() == render(build_vectors()).encode("utf-8")
